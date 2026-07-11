@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>804 The Blaster</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        /* Splash Screen */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            z-index: 100; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: white;
+        }
+        .avatar-circle {
+            width: 160px; height: 160px; border-radius: 50%;
+            border: 4px solid #00ffcc; box-shadow: 0 0 20px #00ffcc;
+            overflow: hidden; margin-bottom: 20px;
+        }
+        .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+        #splash-screen h2 { font-size: 14px; letter-spacing: 4px; color: #00ffcc; text-transform: uppercase; margin-bottom: 5px; }
+        #splash-screen h1 { font-size: 32px; font-weight: 800; margin-bottom: 30px; letter-spacing: 1px; }
+        #start-btn {
+            padding: 14px 45px; font-size: 16px; font-weight: bold;
+            color: #111; background: #00ffcc; border: none; border-radius: 30px;
+            cursor: pointer; box-shadow: 0 5px 15px rgba(0,255,204,0.4); transition: 0.2s;
+        }
+
+        /* Landscape Mode Warning Layer */
+        @media orientation: portrait {
+            #landscape-alert {
+                position: fixed; top:0; left:0; width:100%; height:100%;
+                background: #0f172a; z-index: 999; display: flex;
+                flex-direction: column; align-items: center; justify-content: center;
+                color: white; text-align: center; padding: 20px;
+            }
+            #landscape-alert .icon { font-size: 50px; margin-bottom: 15px; animation: rotatePhone 2s infinite ease-in-out; }
+            @keyframes rotatePhone {
+                0% { transform: rotate(0deg); }
+                50% { transform: rotate(-90deg); }
+                100% { transform: rotate(0deg); }
+            }
+        }
+        @media orientation: landscape {
+            #landscape-alert { display: none !important; }
+        }
+        #landscape-alert { display: none; }
+
+        /* Main Game Layout */
+        #game-container { position: relative; width: 100%; height: 100%; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* Top Horizontal Landscape Scoreboard */
+        #scoreboard {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 700px; height: 55px;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
+            border: 1.5px solid rgba(0, 255, 204, 0.3); border-radius: 12px;
+            display: flex; align-items: center; justify-content: space-around;
+            padding: 0 15px; color: white; z-index: 10;
+        }
+        .score-block { text-align: center; }
+        .score-block .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600; letter-spacing: 1px; }
+        .score-block .val { font-size: 18px; font-weight: bold; color: #fff; margin-top: 2px; }
+        .score-block .val.highlight { color: #00ffcc; }
+
+        /* Status Ticker */
+        #status-bar {
+            position: absolute; top: 75px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6); padding: 5px 20px; border-radius: 20px;
+            color: #ffcc00; font-size: 12px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; z-index: 10; text-align: center;
+        }
+
+        /* Center Feedback Popups */
+        #action-popup {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.7);
+            background: rgba(0, 255, 204, 0.95); color: #111; font-weight: 900;
+            font-size: 28px; padding: 10px 30px; border-radius: 8px; opacity: 0;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.15s;
+            z-index: 15; pointer-events: none; box-shadow: 0 10px 25px rgba(0,255,204,0.4);
+        }
+        #action-popup.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        /* Control Pads Container (Bottom left & right corners) */
+        .control-pad { position: absolute; bottom: 20px; z-index: 20; display: flex; gap: 15px; }
+        #left-pad { left: 25px; }
+        #right-pad { right: 25px; }
+
+        .game-btn {
+            width: 75px; height: 75px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4);
+            color: white; font-weight: bold; font-size: 12px; text-transform: uppercase;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 6px 12px rgba(0,0,0,0.3); transition: 0.1s;
+        }
+        .btn-shot { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+        .btn-loft { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+        .btn-run { background: linear-gradient(135deg, #10b981, #059669); display: none; width: 85px; height: 85px; border-color: #00ffcc; }
+        
+        .game-btn:active { transform: scale(0.92); filter: brightness(1.2); }
+    </style>
+</head>
+<body>
+
+    <div id="landscape-alert">
+        <div class="icon">🔄</div>
+        <h2>Please Rotate Your Phone</h2>
+        <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">Turn your device sideways to play Ali's Cricket 3D</p>
+    </div>
+
+    <div id="splash-screen">
+        <div class="avatar-circle">
+            <img src="ali.jpg" alt="Ali Logo" onerror="this.src='https://images.unsplash.com/photo-1540747737956-378729c4a674?w=200'">
+        </div>
+        <h2>Ali Presents</h2>
+        <h1>804 THE BLASTER</h1>
+        <button id="start-btn">START MATCH</button>
+    </div>
+
+    <div id="game-container">
+        <div id="scoreboard">
+            <div class="score-block">
+                <div class="label">Runs</div>
+                <div id="score-val" class="val highlight">0</div>
+            </div>
+            <div class="score-block">
+                <div class="label">Wickets</div>
+                <div id="wickets-val" class="val">0</div>
+            </div>
+            <div class="score-block">
+                <div class="label">4s / 6s</div>
+                <div id="boundaries-val" class="val">0/0</div>
+            </div>
+        </div>
+
+        <div id="status-bar"><span id="status-text">WAITING FOR BOWLER...</span></div>
+        <div id="action-popup">SHOT!</div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="control-pad" id="left-pad">
+            <div class="game-btn btn-shot" id="btn-ground">🏏<br>Ground</div>
+            <div class="game-btn btn-loft" id="btn-loft">🚀<br>Loft</div>
+        </div>
+
+        <div class="control-pad" id="right-pad">
+            <div class="game-btn btn-run" id="run-btn">🏃‍♂️<br>RUN</div>
+        </div>
+        <audio id="bgMusic" loop>
+        <source src="music.mp3" type="audio/mpeg">
+    </audio>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
